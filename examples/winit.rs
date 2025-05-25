@@ -2,7 +2,7 @@ use std::{ptr, time::Instant};
 
 use imgui::{FontConfig, FontSource};
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows::Win32::Foundation::{BOOL, HWND};
 use windows::Win32::Graphics::Direct3D9::{
     Direct3DCreate9, IDirect3D9, IDirect3DDevice9, D3DADAPTER_DEFAULT,
@@ -11,11 +11,11 @@ use windows::Win32::Graphics::Direct3D9::{
     D3DSWAPEFFECT_DISCARD, D3D_SDK_VERSION,
 };
 use windows::Win32::System::SystemServices::D3DCLEAR_TARGET;
+use winit::window::WindowAttributes;
 use winit::{
     dpi::LogicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
-    window::WindowBuilder,
 };
 
 const WINDOW_WIDTH: f64 = 760.0;
@@ -59,22 +59,22 @@ unsafe fn set_up_dx_context(hwnd: HWND) -> (IDirect3D9, IDirect3DDevice9) {
 }
 
 fn main() {
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new()
-        .with_title("imgui_dx9_renderer winit example")
-        .with_resizable(false)
-        .with_inner_size(LogicalSize { width: WINDOW_WIDTH, height: WINDOW_HEIGHT })
-        .build(&event_loop)
-        .unwrap();
-    let hwnd = if let RawWindowHandle::Win32(handle) = window.raw_window_handle() {
-        HWND(handle.hwnd as isize)
+    let event_loop = EventLoop::new().unwrap();
+    #[allow(deprecated)]
+    let window = event_loop.create_window(WindowAttributes::default()
+    .with_title("imgui_dx9_renderer winit example")
+    .with_resizable(false)
+    .with_inner_size(LogicalSize { width: WINDOW_WIDTH, height: WINDOW_HEIGHT })).unwrap();
+
+    let hwnd = if let RawWindowHandle::Win32(handle) = window.window_handle().unwrap().as_raw() {
+        HWND(isize::from(handle.hwnd))
     } else {
         unreachable!()
     };
     let (_d9, device) = unsafe { set_up_dx_context(hwnd) };
     let mut imgui = imgui::Context::create();
     imgui.set_ini_filename(None);
-    let mut platform = WinitPlatform::init(&mut imgui);
+    let mut platform = WinitPlatform::new(&mut imgui);
     platform.attach_window(imgui.io_mut(), &window, HiDpiMode::Rounded);
 
     let hidpi_factor = platform.hidpi_factor();
@@ -89,18 +89,19 @@ fn main() {
 
     let mut last_frame = Instant::now();
 
-    event_loop.run(move |event, _, control_flow| match event {
+    #[allow(deprecated)]
+    event_loop.run(move |event, control_flow,| match event {
         Event::NewEvents(_) => {
             let now = Instant::now();
             imgui.io_mut().update_delta_time(now - last_frame);
             last_frame = now;
         },
-        Event::MainEventsCleared => {
+        Event::AboutToWait => {
             let io = imgui.io_mut();
             platform.prepare_frame(io, &window).expect("Failed to start frame");
             window.request_redraw();
         },
-        Event::RedrawRequested(_) => {
+        Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
             unsafe {
                 device
                     .Clear(0, ptr::null_mut(), D3DCLEAR_TARGET as u32, 0xFFAA_AAAA, 1.0, 0)
@@ -127,10 +128,10 @@ fn main() {
             }
         },
         Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
-            *control_flow = winit::event_loop::ControlFlow::Exit
+            control_flow.exit();
         },
         event => {
             platform.handle_event(imgui.io_mut(), &window, &event);
         },
-    });
+    }).unwrap();
 }
