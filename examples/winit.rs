@@ -1,16 +1,15 @@
+use std::ffi::c_void;
 use std::{ptr, time::Instant};
 
 use imgui::{FontConfig, FontSource};
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use windows::Win32::Foundation::{BOOL, HWND};
+use windows::core::BOOL;
+use windows::Win32::Foundation::{HWND};
 use windows::Win32::Graphics::Direct3D9::{
-    Direct3DCreate9, IDirect3D9, IDirect3DDevice9, D3DADAPTER_DEFAULT,
-    D3DCREATE_SOFTWARE_VERTEXPROCESSING, D3DDEVTYPE_HAL, D3DFMT_R5G6B5, D3DMULTISAMPLE_NONE,
-    D3DPRESENT_INTERVAL_DEFAULT, D3DPRESENT_PARAMETERS, D3DPRESENT_RATE_DEFAULT,
-    D3DSWAPEFFECT_DISCARD, D3D_SDK_VERSION,
+    Direct3DCreate9, IDirect3D9, IDirect3DDevice9, D3DADAPTER_DEFAULT, D3DCLEAR_TARGET, D3DCREATE_SOFTWARE_VERTEXPROCESSING, D3DDEVTYPE_HAL, D3DFMT_R5G6B5, D3DMULTISAMPLE_NONE, D3DPRESENT_INTERVAL_DEFAULT, D3DPRESENT_PARAMETERS, D3DPRESENT_RATE_DEFAULT, D3DSWAPEFFECT_DISCARD, D3D_SDK_VERSION
 };
-use windows::Win32::System::SystemServices::D3DCLEAR_TARGET;
+
 use winit::window::WindowAttributes;
 use winit::{
     dpi::LogicalSize,
@@ -67,7 +66,7 @@ fn main() {
     .with_inner_size(LogicalSize { width: WINDOW_WIDTH, height: WINDOW_HEIGHT })).unwrap();
 
     let hwnd = if let RawWindowHandle::Win32(handle) = window.window_handle().unwrap().as_raw() {
-        HWND(isize::from(handle.hwnd))
+        HWND(isize::from(handle.hwnd) as *mut c_void)
     } else {
         unreachable!()
     };
@@ -124,7 +123,7 @@ fn main() {
             renderer.render(imgui.render()).unwrap();
             unsafe {
                 device.EndScene().unwrap();
-                device.Present(ptr::null_mut(), ptr::null_mut(), None, ptr::null_mut()).unwrap();
+                device.Present(ptr::null_mut(), ptr::null_mut(), HWND(ptr::null_mut()), ptr::null_mut()).unwrap();
             }
         },
         Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
